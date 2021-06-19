@@ -136,15 +136,16 @@ function getData(url) {
 function newsFeed() {
   var newsFeed = getData(NEWS_RUL);
   var newsList = [];
-  newsList.push('<ul>');
+  var template = "\n        <div class=\"container mx-auto p-4\">\n            <h1>Hacker News</h1>\n            <ul>\n                {{__news_feed__}}\n            </ul>\n            <div>\n                <a href=\"#/page/{{__prev_page__}}\">\uC774\uC804 \uD398\uC774\uC9C0</a>\n                <a href=\"#/page/{{__next_page__}}\">\uB2E4\uC74C \uD398\uC774\uC9C0</a>\n            </div>\n        </div>\n    ";
 
   for (var i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
     newsList.push("\n        <li>\n            <a href=\"#/show/".concat(newsFeed[i].id, "\">\n                ").concat(newsFeed[i].title, " (").concat(newsFeed[i].comments_count, ")\n            </a>\n        </li>\n    "));
   }
 
-  newsList.push('</ul>');
-  newsList.push('' + '<div>' + "<a href=\"#/page/".concat(store.currentPage > 1 ? store.currentPage - 1 : 1, "\">\uC774\uC804 \uD398\uC774\uC9C0</a>") + "<a href=\"#/page/".concat(store.currentPage < newsFeed.length / 10 ? store.currentPage + 1 : store.currentPage, "\">\uB2E4\uC74C \uD398\uC774\uC9C0</a>") + '</div>');
-  container.innerHTML = newsList.join('');
+  template = template.replace("{{__news_feed__}}", newsList.join(''));
+  template = template.replace("{{__prev_page__}}", store.currentPage > 1 ? store.currentPage - 1 : '1');
+  template = template.replace("{{__next_page__}}", store.currentPage < newsFeed.length / 10 ? store.currentPage + 1 : store.currentPage);
+  container.innerHTML = template;
 }
 
 function newsDetail() {
@@ -168,7 +169,7 @@ function router() {
 
 window.addEventListener('hashchange', router);
 router();
-},{}],"../../AppData/Roaming/nvm/v10.13.0/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+},{}],"../../AppData/Roaming/nvm/v14.15.0/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -196,7 +197,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "59272" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "49653" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};
@@ -372,5 +373,5 @@ function hmrAcceptRun(bundle, id) {
     return true;
   }
 }
-},{}]},{},["../../AppData/Roaming/nvm/v10.13.0/node_modules/parcel-bundler/src/builtins/hmr-runtime.js","app.js"], null)
+},{}]},{},["../../AppData/Roaming/nvm/v14.15.0/node_modules/parcel-bundler/src/builtins/hmr-runtime.js","app.js"], null)
 //# sourceMappingURL=/app.c328ef1a.js.map
