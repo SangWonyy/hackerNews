@@ -61,46 +61,81 @@ class NewsDetailApi extends Api {
     }
 }
 
-class NewsFeedView extends View {
-    constructor() {
-        const api = new NewsFeedApi(NEWS_URL);
-        let newsFeed: NewsFeed[] = store.feeds;
-        let template = `
-        <div class="bg-gray-600 min-h-screen">
-          <div class="bg-white text-xl">
-            <div class="mx-auto px-4">
-              <div class="flex justify-between items-center py-6">
-                <div class="flex justify-start">
-                  <h1 class="font-extrabold">Hacker News</h1>
-                </div>
-                <div class="items-center justify-end">
-                  <a href="#/page/{{__prev_page__}}" class="text-gray-500">
-                    Previous
-                  </a>
-                  <a href="#/page/{{__next_page__}}" class="text-gray-500 ml-4">
-                    Next
-                  </a>
-                </div>
-              </div> 
-            </div>
-          </div>
-          <div class="p-4 text-2xl text-gray-700">
-            {{__news_feed__}}        
-          </div>
-        </div>
-     `;
+class View {
+    template: string;
+    container: HTMLElement;
+    htmlList: string[];
 
-        if (newsFeed.length === 0) {
-            newsFeed = store.feeds = makeFeeds(api.getData());
+    constructor(containerId: string, template: string) {
+        const containerElement = document.getElementById(containerId);
+
+        if (!containerElement) {
+            throw '최상위 컨테이너가 없어 UI를 진행하지 못합니다.';
+        }
+
+        this.container = containerElement;
+        this.template = template;
+        this.htmlList = [];
+    }
+
+    updateView(html: string): void {
+        this.container.innerHTML = html;
+    }
+
+    addHtml(htmlString: string): void {
+        this.htmlList.push(htmlString);
+    }
+
+    getHtml(): string {
+        return this.htmlList.join('');
+    }
+}
+
+class NewsFeedView extends View {
+    api: NewsFeedApi;
+    feeds: NewsFeed[];
+
+    constructor(containerId: string) {
+        let template = `
+            <div class="bg-gray-600 min-h-screen">
+              <div class="bg-white text-xl">
+                <div class="mx-auto px-4">
+                  <div class="flex justify-between items-center py-6">
+                    <div class="flex justify-start">
+                      <h1 class="font-extrabold">Hacker News</h1>
+                    </div>
+                    <div class="items-center justify-end">
+                      <a href="#/page/{{__prev_page__}}" class="text-gray-500">
+                        Previous
+                      </a>
+                      <a href="#/page/{{__next_page__}}" class="text-gray-500 ml-4">
+                        Next
+                      </a>
+                    </div>
+                  </div> 
+                </div>
+              </div>
+              <div class="p-4 text-2xl text-gray-700">
+                {{__news_feed__}}        
+              </div>
+            </div>
+         `;
+
+        super(containerId, template);
+        this.api = new NewsFeedApi(NEWS_URL);
+        this.feeds = store.feeds;
+
+
+        if (this.feeds.length === 0) {
+            this.feeds = this.api.getData();
+            this.makeFeeds();
         }
     }
 
-    render() {
-        const newsList = [];
-
+    render(): void {
         for(let i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
 
-            newsList.push(`
+            this.addHtml(`
               <div class="p-6 ${newsFeed[i].read ? 'bg-red-500' : 'bg-white'} mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100">
                 <div class="flex">
                   <div class="flex-auto">
@@ -121,7 +156,7 @@ class NewsFeedView extends View {
           `);
         }
 
-        template = template.replace(`{{__news_feed__}}`, newsList.join(''));
+        template = template.replace(`{{__news_feed__}}`, this.getHtml());
         template = template.replace(`{{__prev_page__}}`, String(store.currentPage > 1 ? store.currentPage - 1 : 1));
         template = template.replace(`{{__next_page__}}`, String(store.currentPage < newsFeed.length / 10 ? store.currentPage + 1 : store.currentPage));
 
@@ -129,12 +164,10 @@ class NewsFeedView extends View {
         updateVeiew(template);
     }
 
-    makeFeeds(feeds: NewsFeed[]): NewsFeed[] {
-        for (let i = 0; i < feeds.length; i++) {
-            feeds[i].read = false;
+    makeFeeds(): void {
+        for (let i = 0; i < this.feeds.length; i++) {
+            this.feeds[i].read = false;
         }
-
-        return feeds;
     }
 }
 
@@ -147,8 +180,7 @@ function updateVeiew (html: string): void {
 }
 
 class NewsDetailView extends View {
-    constructor() {
-
+    constructor(containerId: string) {
         let template = `
         <div class="bg-gray-600 min-h-screen pb-8">
           <div class="bg-white text-xl">
@@ -177,7 +209,7 @@ class NewsDetailView extends View {
           </div>
         </div>
     `;
-
+        super(containerId, template);
     }
 
     render() {
@@ -193,15 +225,13 @@ class NewsDetailView extends View {
             }
         }
 
-        updateVeiew(template.replace('{{__comments__}}', makeCommment(newsContent.comments)));
+        this.updateView(template.replace('{{__comments__}}', this.makeCommment(newsDetail.comments)));
     }
 
     makeCommment(comments: NewsComment[]): string {
-        const commentString = [];
-
         for(let i = 0; i < comments.length; i++) {
             const comment: NewsComment = comments[i];
-            commentString.push(`
+            this.addHtml(`
                 <div style="padding-left: ${comment.level * 40}px;" class="mt-4">
                   <div class="text-gray-400">
                     <i class="fa fa-sort-up mr-2"></i>
@@ -212,18 +242,12 @@ class NewsDetailView extends View {
             `);
 
             if (comment.comments.length > 0) {
-                commentString.push(makeCommment(comment.comments));
+                this.addHtml(this.makeCommment(comment.comments));
             }
         }
 
 
-        return commentString.join('');
-    }
-}
-
-class View {
-    constructor() {
-
+        return this.getHtml();
     }
 }
 
