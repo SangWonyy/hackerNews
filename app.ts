@@ -25,8 +25,10 @@ interface NewsComment extends News {
     readonly level: number;
 }
 
-const container: HTMLElement | null = document.getElementById('root');
-const ajax: XMLHttpRequest = new XMLHttpRequest();
+interface RouteInfo {
+    path: string;
+    page: View;
+}
 const NEWS_URL = 'https://api.hnpwa.com/v0/news/1.json';
 const CONTENT_URL ='https://api.hnpwa.com/v0/item/@id.json';
 const store: Store = {
@@ -61,10 +63,11 @@ class NewsDetailApi extends Api {
     }
 }
 
-class View {
-    template: string;
-    container: HTMLElement;
-    htmlList: string[];
+abstract class View {
+    private template: string;
+    private renderTemplate: string;
+    private container: HTMLElement;
+    private htmlList: string[];
 
     constructor(containerId: string, template: string) {
         const containerElement = document.getElementById(containerId);
@@ -75,25 +78,79 @@ class View {
 
         this.container = containerElement;
         this.template = template;
+        this.renderTemplate = template;
         this.htmlList = [];
     }
 
-    updateView(html: string): void {
-        this.container.innerHTML = html;
+    protected updateView(): void {
+        this.container.innerHTML = this.renderTemplate;
+        this.renderTemplate = this.template;
     }
 
-    addHtml(htmlString: string): void {
+    protected addHtml(htmlString: string): void {
         this.htmlList.push(htmlString);
     }
 
-    getHtml(): string {
-        return this.htmlList.join('');
+    protected getHtml(): string {
+        const snapshot = this.htmlList.join('');
+        this.clearHtmlList();
+        return snapshot;
     }
+
+    protected setTemplateData(key: string, value: string): void {
+        this.renderTemplate = this.renderTemplate.replace(`{{__${key}__}}`, value);
+    }
+
+    private clearHtmlList(): void {
+        this.htmlList = [];
+    }
+
+    // render : view를 업데이트를 시킨다는 공통적인 이름
+    // 자식들은 강제적으로 render를 명시해야 한다고 시킬 수 있다.
+    // View class를 상속 받으면 의무적으로 render를 구현해야한다.
+    // ==> abstract 추상 메소드
+    abstract render(): void;
 }
 
+class Router {
+    routeTable: RouteInfo[];
+    defaultRoute: RouteInfo | null;
+
+    constructor() {
+
+        window.addEventListener('hashchange', this.route.bind(this));
+
+        this.routeTable = [];
+        this.defaultRoute = null;
+    }
+
+    setDefaultPage(page: View): void {
+        this.defaultRoute = { path: '', page };
+    }
+
+    addRouterPath(path: string, page: View): void {
+        this.routeTable.push({ path, page })
+    }
+
+    route() {
+        const routePath = location.hash;
+
+        if (routePath === '' && this.defaultRoute) {
+            this.defaultRoute.page.render();
+            return;
+        }
+
+        for (const routeInfo of this.routeTable) {
+            if (routePath.indexOf(routeInfo.path) >= 0) {
+                routeInfo.page.render();
+                break;
+            }
+        }
+    }
+}
 class NewsFeedView extends View {
-    api: NewsFeedApi;
-    feeds: NewsFeed[];
+    private api: NewsFeedApi;
+    private feeds: NewsFeed[];
 
     constructor(containerId: string) {
         let template = `
@@ -133,49 +190,42 @@ class NewsFeedView extends View {
     }
 
     render(): void {
+        store.currentPage = Number(location.hash.substr(7) || 1);
         for(let i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
+            const { id, title, comments_count, user, points, time_ago, read } = this.feeds[i];
 
             this.addHtml(`
-              <div class="p-6 ${newsFeed[i].read ? 'bg-red-500' : 'bg-white'} mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100">
+              <div class="p-6 ${read ? 'bg-red-500' : 'bg-white'} mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100">
                 <div class="flex">
                   <div class="flex-auto">
-                    <a href="#/show/${newsFeed[i].id}">${newsFeed[i].title}</a>  
+                    <a href="#/show/${id}">${title}</a>  
                   </div>
                   <div class="text-center text-sm">
-                    <div class="w-10 text-white bg-green-300 rounded-lg px-0 py-2">${newsFeed[i].comments_count}</div>
+                    <div class="w-10 text-white bg-green-300 rounded-lg px-0 py-2">${comments_count}</div>
                   </div>
                 </div>
                 <div class="flex mt-3">
                   <div class="grid grid-cols-3 text-sm text-gray-500">
-                    <div><i class="fas fa-user mr-1"></i>${newsFeed[i].user}</div>
-                    <div><i class="fas fa-heart mr-1"></i>${newsFeed[i].points}</div>
-                    <div><i class="far fa-clock mr-1"></i>${newsFeed[i].time_ago}</div>
+                    <div><i class="fas fa-user mr-1"></i>${user}</div>
+                    <div><i class="fas fa-heart mr-1"></i>${points}</div>
+                    <div><i class="far fa-clock mr-1"></i>${time_ago}</div>
                   </div>  
                 </div>
               </div> 
           `);
         }
 
-        template = template.replace(`{{__news_feed__}}`, this.getHtml());
-        template = template.replace(`{{__prev_page__}}`, String(store.currentPage > 1 ? store.currentPage - 1 : 1));
-        template = template.replace(`{{__next_page__}}`, String(store.currentPage < newsFeed.length / 10 ? store.currentPage + 1 : store.currentPage));
+        this.setTemplateData("news_feed", this.getHtml());
+        this.setTemplateData("prev_page", String(store.currentPage > 1 ? store.currentPage - 1 : 1));
+        this.setTemplateData("next_page", String(store.currentPage < this.feeds.length / 10 ? store.currentPage + 1 : store.currentPage));
 
-
-        updateVeiew(template);
+        this.updateView();
     }
 
-    makeFeeds(): void {
+    private makeFeeds(): void {
         for (let i = 0; i < this.feeds.length; i++) {
             this.feeds[i].read = false;
         }
-    }
-}
-
-function updateVeiew (html: string): void {
-    if (container) {
-        container.innerHTML = html;
-    } else {
-        console.error('최상위 컨테이너가 없어 UI를 진행할 수 없습니다.');
     }
 }
 
@@ -190,7 +240,7 @@ class NewsDetailView extends View {
                   <h1 class="font-extrabold">Hacker News</h1>
                 </div>
                 <div class="items-center justify-end">
-                  <a href="#/page/${store.currentPage}" class="text-gray-500">
+                  <a href="#/page/{{__currentPage__}}" class="text-gray-500">
                     <i class="fa fa-times"></i>
                   </a>
                 </div>
@@ -199,13 +249,11 @@ class NewsDetailView extends View {
           </div>
     
           <div class="h-full border rounded-xl bg-white m-6 p-4 ">
-            <h2>${newsContent.title}</h2>
+            <h2>{{__title__}}</h2>
             <div class="text-gray-400 h-20">
-              ${newsContent.content}
+              {{__content__}}
             </div>
-    
             {{__comments__}}
-    
           </div>
         </div>
     `;
@@ -215,7 +263,7 @@ class NewsDetailView extends View {
     render() {
         const id = location.hash.substr(7);
         const api = new NewsDetailApi(CONTENT_URL.replace('@id', id))
-        const newsContent = api.getData();
+        const newsDetail: NewsDetail = api.getData();
 
 
         for(let i = 0; i < store.feeds.length; i++) {
@@ -225,7 +273,12 @@ class NewsDetailView extends View {
             }
         }
 
-        this.updateView(template.replace('{{__comments__}}', this.makeCommment(newsDetail.comments)));
+        this.setTemplateData("comments", this.makeCommment(newsDetail.comments));
+        this.setTemplateData("currentPage", String(store.currentPage));
+        this.setTemplateData("title", newsDetail.title);
+        this.setTemplateData("content", newsDetail.content);
+
+        this.updateView();
     }
 
     makeCommment(comments: NewsComment[]): string {
@@ -251,128 +304,12 @@ class NewsDetailView extends View {
     }
 }
 
-function newsFeed(): void {
-    const api = new NewsFeedApi(NEWS_URL);
-    let newsFeed: NewsFeed[] = store.feeds;
-    const newsList = [];
-    let template = `
-        <div class="bg-gray-600 min-h-screen">
-          <div class="bg-white text-xl">
-            <div class="mx-auto px-4">
-              <div class="flex justify-between items-center py-6">
-                <div class="flex justify-start">
-                  <h1 class="font-extrabold">Hacker News</h1>
-                </div>
-                <div class="items-center justify-end">
-                  <a href="#/page/{{__prev_page__}}" class="text-gray-500">
-                    Previous
-                  </a>
-                  <a href="#/page/{{__next_page__}}" class="text-gray-500 ml-4">
-                    Next
-                  </a>
-                </div>
-              </div> 
-            </div>
-          </div>
-          <div class="p-4 text-2xl text-gray-700">
-            {{__news_feed__}}        
-          </div>
-        </div>
-    `;
+const router: Router = new Router();
+const newsFeedView = new NewsFeedView('root');
+const newsDetailView = new NewsDetailView('root');
 
-    if (newsFeed.length === 0) {
-        newsFeed = store.feeds = makeFeeds(api.getData());
-    }
+router.setDefaultPage(newsFeedView);
+router.addRouterPath('/page/', newsFeedView);
+router.addRouterPath('/show/', newsDetailView);
 
-    for(let i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
-
-        newsList.push(`
-      <div class="p-6 ${newsFeed[i].read ? 'bg-red-500' : 'bg-white'} mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100">
-        <div class="flex">
-          <div class="flex-auto">
-            <a href="#/show/${newsFeed[i].id}">${newsFeed[i].title}</a>  
-          </div>
-          <div class="text-center text-sm">
-            <div class="w-10 text-white bg-green-300 rounded-lg px-0 py-2">${newsFeed[i].comments_count}</div>
-          </div>
-        </div>
-        <div class="flex mt-3">
-          <div class="grid grid-cols-3 text-sm text-gray-500">
-            <div><i class="fas fa-user mr-1"></i>${newsFeed[i].user}</div>
-            <div><i class="fas fa-heart mr-1"></i>${newsFeed[i].points}</div>
-            <div><i class="far fa-clock mr-1"></i>${newsFeed[i].time_ago}</div>
-          </div>  
-        </div>
-      </div> 
-    `);
-    }
-
-    template = template.replace(`{{__news_feed__}}`, newsList.join(''));
-    template = template.replace(`{{__prev_page__}}`, String(store.currentPage > 1 ? store.currentPage - 1 : 1));
-    template = template.replace(`{{__next_page__}}`, String(store.currentPage < newsFeed.length / 10 ? store.currentPage + 1 : store.currentPage));
-
-
-    updateVeiew(template);
-}
-
-function newsDetail(): void {
-    const id = location.hash.substr(7);
-    const api = new NewsDetailApi(CONTENT_URL.replace('@id', id))
-    const newsContent = api.getData();
-    let template = `
-        <div class="bg-gray-600 min-h-screen pb-8">
-          <div class="bg-white text-xl">
-            <div class="mx-auto px-4">
-              <div class="flex justify-between items-center py-6">
-                <div class="flex justify-start">
-                  <h1 class="font-extrabold">Hacker News</h1>
-                </div>
-                <div class="items-center justify-end">
-                  <a href="#/page/${store.currentPage}" class="text-gray-500">
-                    <i class="fa fa-times"></i>
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-    
-          <div class="h-full border rounded-xl bg-white m-6 p-4 ">
-            <h2>${newsContent.title}</h2>
-            <div class="text-gray-400 h-20">
-              ${newsContent.content}
-            </div>
-    
-            {{__comments__}}
-    
-          </div>
-        </div>
-    `;
-
-    for(let i = 0; i < store.feeds.length; i++) {
-        if (store.feeds[i].id === +id) {
-            store.feeds[i].read = true;
-            break;
-        }
-    }
-
-    updateVeiew(template.replace('{{__comments__}}', makeCommment(newsContent.comments)));
-}
-
-
-function router(): void {
-    const routePath = location.hash;
-
-    if (routePath === '') {
-        newsFeed();
-    } else if(routePath.indexOf('#/page/') >= 0) {
-        store.currentPage = +routePath.substr(7);
-        newsFeed();
-    } else {
-        newsDetail();
-    }
-
-}
-
-window.addEventListener('hashchange', router);
-
-router();
+router.route();
