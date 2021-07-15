@@ -8,22 +8,31 @@ export class Api {
         this.ajax = new XMLHttpRequest();
     }
 
-    protected getRequest<AjaxResponse>(): AjaxResponse {
-        this.ajax.open('GET', this.url, false);
+    protected getRequest<AjaxResponse>(cd: (data: AjaxResponse) => void): void {
+        this.ajax.open('GET', this.url);
+        this.ajax.addEventListener('load', () => {
+            cd(JSON.parse(this.ajax.response) as AjaxResponse);
+        })
         this.ajax.send();
-
-        return JSON.parse(this.ajax.response);
     }
 }
 
 export class NewsFeedApi extends Api {
-    getData(): NewsFeed[] {
-        return this.getRequest<NewsFeed[]>();
+    constructor(url: string) {
+        super(url);
+    }
+
+    getData(cd: (data: NewsFeed[]) => void): void {
+        return this.getRequest<NewsFeed[]>(cd);
     }
 }
 
 export class NewsDetailApi extends Api {
-    getData(): NewsDetail {
-        return this.getRequest<NewsDetail>();
+    constructor(url: string) {
+        super(url);
+    }
+
+    getData(cd: (data: NewsDetail) => void): void {
+        return this.getRequest<NewsDetail>(cd);
     }
 }
