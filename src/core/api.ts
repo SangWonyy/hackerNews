@@ -1,19 +1,30 @@
 import { NewsFeed, NewsDetail } from '../types';
 
-export class Api {
+export default class Api {
+    xhr: XMLHttpRequest;
     url: string;
-    ajax: XMLHttpRequest;
+
     constructor(url: string) {
+        this.xhr = new XMLHttpRequest();
         this.url = url;
-        this.ajax = new XMLHttpRequest();
     }
 
-    protected getRequest<AjaxResponse>(cd: (data: AjaxResponse) => void): void {
-        this.ajax.open('GET', this.url);
-        this.ajax.addEventListener('load', () => {
-            cd(JSON.parse(this.ajax.response) as AjaxResponse);
-        })
-        this.ajax.send();
+    getRequestWithXHR<AjaxResponse>(cb: (data: AjaxResponse) => void): void {
+        this.xhr.open('GET', this.url);
+        this.xhr.addEventListener('load', () => {
+            cb(JSON.parse(this.xhr.response) as AjaxResponse);
+        });
+
+        this.xhr.send();
+    }
+
+    getRequestWithPromise<AjaxResponse>(cb: (data: AjaxResponse) => void): void {
+        fetch(this.url)
+            .then(response => response.json())
+            .then(cb)
+            .catch(() => {
+                console.error('데이타를 불러오지 못했습니다.');
+            });
     }
 }
 
@@ -22,8 +33,12 @@ export class NewsFeedApi extends Api {
         super(url);
     }
 
-    getData(cd: (data: NewsFeed[]) => void): void {
-        return this.getRequest<NewsFeed[]>(cd);
+    getDataWithXHR(cb: (data: NewsFeed[]) => void): void {
+        return this.getRequestWithXHR<NewsFeed[]>(cb);
+    }
+
+    getDataWithPromise(cb: (data: NewsFeed[]) => void): void {
+        return this.getRequestWithPromise<NewsFeed[]>(cb);
     }
 }
 
@@ -32,7 +47,11 @@ export class NewsDetailApi extends Api {
         super(url);
     }
 
-    getData(cd: (data: NewsDetail) => void): void {
-        return this.getRequest<NewsDetail>(cd);
+    getDataWithXHR(cb: (data: NewsDetail) => void): void {
+        return this.getRequestWithXHR<NewsDetail>(cb);
+    }
+
+    getDataWithPromise(cb: (data: NewsDetail) => void): void {
+        return this.getRequestWithPromise<NewsDetail>(cb);
     }
 }
